@@ -1,5 +1,5 @@
 #!/bin/bash
-# Startup script for OpenClaw in Cloudflare Sandbox
+# Startup script for OpenClaw in Cloudflare Sandbox (v3)
 # This script:
 # 1. Restores config/workspace/skills from R2 via rclone (if configured)
 # 2. Runs openclaw onboard --non-interactive to configure from env vars
@@ -114,6 +114,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
         AUTH_ARGS="--auth-choice apiKey --anthropic-api-key $ANTHROPIC_API_KEY"
     elif [ -n "$OPENAI_API_KEY" ]; then
         AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
+    elif [ -n "$MOONSHOT_API_KEY" ]; then
+        AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $MOONSHOT_API_KEY"
     fi
 
     openclaw onboard --non-interactive --accept-risk \
@@ -217,6 +219,57 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
     } else {
         console.warn('CF_AI_GATEWAY_MODEL set but missing required config (account ID, gateway ID, or API key)');
     }
+}
+
+// Anthropic configuration
+if (process.env.ANTHROPIC_API_KEY) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['anthropic'] = config.models.providers['anthropic'] || {};
+    config.models.providers['anthropic'].baseUrl = 'https://api.anthropic.com';
+    config.models.providers['anthropic'].apiKey = process.env.ANTHROPIC_API_KEY;
+    config.models.providers['anthropic'].api = 'anthropic-messages';
+    if (!config.models.providers['anthropic'].models || config.models.providers['anthropic'].models.length === 0) {
+        config.models.providers['anthropic'].models = [
+            { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', contextWindow: 200000, maxTokens: 16384 },
+            { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', contextWindow: 200000, maxTokens: 16384 },
+        ];
+    }
+    console.log('Anthropic configured: apiKey injected from env');
+}
+
+// Moonshot AI (Kimi K2.5) configuration
+if (process.env.MOONSHOT_API_KEY) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['moonshot'] = {
+        baseUrl: 'https://api.moonshot.cn/v1',
+        apiKey: process.env.MOONSHOT_API_KEY,
+        api: 'openai-completions',
+        models: [
+            { id: 'kimi-k2.5', name: 'Kimi K2.5', contextWindow: 262144, maxTokens: 8192 },
+        ],
+    };
+    // Set Kimi K2.5 as default model
+    config.agents = config.agents || {};
+    config.agents.defaults = config.agents.defaults || {};
+    config.agents.defaults.model = { primary: 'moonshot/kimi-k2.5' };
+    console.log('Moonshot AI configured: Kimi K2.5 set as primary model');
+}
+
+// MiniMax configuration
+if (process.env.MINIMAX_API_KEY) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers['minimax'] = {
+        baseUrl: 'https://api.minimaxi.com/anthropic',
+        apiKey: process.env.MINIMAX_API_KEY,
+        api: 'anthropic-messages',
+        models: [
+            { id: 'MiniMax-M2.5', name: 'MiniMax M2.5', contextWindow: 200000, maxTokens: 8192 },
+        ],
+    };
+    console.log('MiniMax configured: MiniMax-M2.5 available');
 }
 
 // Telegram configuration

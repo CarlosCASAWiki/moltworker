@@ -81,10 +81,11 @@ function validateRequiredEnv(env: MoltbotEnv): string[] {
   const hasLegacyGateway = !!(env.AI_GATEWAY_API_KEY && env.AI_GATEWAY_BASE_URL);
   const hasAnthropicKey = !!env.ANTHROPIC_API_KEY;
   const hasOpenAIKey = !!env.OPENAI_API_KEY;
+  const hasMoonshotKey = !!env.MOONSHOT_API_KEY;
 
-  if (!hasCloudflareGateway && !hasLegacyGateway && !hasAnthropicKey && !hasOpenAIKey) {
+  if (!hasCloudflareGateway && !hasLegacyGateway && !hasAnthropicKey && !hasOpenAIKey && !hasMoonshotKey) {
     missing.push(
-      'ANTHROPIC_API_KEY, OPENAI_API_KEY, or CLOUDFLARE_AI_GATEWAY_API_KEY + CF_AI_GATEWAY_ACCOUNT_ID + CF_AI_GATEWAY_GATEWAY_ID',
+      'ANTHROPIC_API_KEY, OPENAI_API_KEY, MOONSHOT_API_KEY, or CLOUDFLARE_AI_GATEWAY_API_KEY + CF_AI_GATEWAY_ACCOUNT_ID + CF_AI_GATEWAY_GATEWAY_ID',
     );
   }
 
@@ -150,6 +151,18 @@ app.route('/', publicRoutes);
 
 // Mount CDP routes (uses shared secret auth via query param, not CF Access)
 app.route('/cdp', cdp);
+
+// WeCom (企业微信) webhook: bypass CF Access, proxy to container gateway
+app.all('/webhooks/wecom', async (c) => {
+  const sandbox = c.get('sandbox');
+  await ensureMoltbotGateway(sandbox, c.env);
+  return sandbox.containerFetch(c.req.raw, MOLTBOT_PORT);
+});
+app.all('/webhooks/wecom/*', async (c) => {
+  const sandbox = c.get('sandbox');
+  await ensureMoltbotGateway(sandbox, c.env);
+  return sandbox.containerFetch(c.req.raw, MOLTBOT_PORT);
+});
 
 // =============================================================================
 // PROTECTED ROUTES: Cloudflare Access authentication required
