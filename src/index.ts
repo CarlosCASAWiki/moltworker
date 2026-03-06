@@ -153,7 +153,36 @@ app.route('/', publicRoutes);
 app.route('/cdp', cdp);
 
 // WeCom (企业微信) webhook: bypass CF Access, proxy to container gateway
+// Also handles admin config update when X-Gateway-Token + X-Action: update-config headers are present
 app.all('/webhooks/wecom', async (c) => {
+  // Admin config update: POST with X-Gateway-Token + X-Action: update-config
+  if (
+    c.req.method === 'POST' &&
+    c.req.header('X-Action') === 'update-config' &&
+    c.req.header('X-Gateway-Token') === c.env.MOLTBOT_GATEWAY_TOKEN
+  ) {
+    const sandbox = c.get('sandbox');
+    const body = await c.req.text();
+    try {
+      JSON.parse(body);
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const base64 = btoa(unescape(encodeURIComponent(body)));
+    await sandbox.exec(`echo '${base64}' | base64 -d > /root/.openclaw/openclaw.json`);
+    const existingProcess = await findExistingMoltbotProcess(sandbox);
+    if (existingProcess) {
+      try { await existingProcess.kill(); } catch {}
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+    c.executionCtx.waitUntil(ensureMoltbotGateway(sandbox, c.env).catch(() => {}));
+    return c.json({
+      success: true,
+      message: existingProcess ? 'Config updated, gateway restarting...' : 'Config updated, gateway starting...',
+    });
+  }
+
+  // Normal WeCom webhook: proxy to container gateway
   const sandbox = c.get('sandbox');
   await ensureMoltbotGateway(sandbox, c.env);
   return sandbox.containerFetch(c.req.raw, MOLTBOT_PORT);

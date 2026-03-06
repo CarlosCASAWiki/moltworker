@@ -273,9 +273,10 @@ if (process.env.MINIMAX_API_KEY) {
 }
 
 // Telegram configuration
+// Skip patching if config already has multi-account structure (accounts key)
 // Overwrite entire channel object to drop stale keys from old R2 backups
 // that would fail OpenClaw's strict config validation (see #47)
-if (process.env.TELEGRAM_BOT_TOKEN) {
+if (process.env.TELEGRAM_BOT_TOKEN && !(config.channels.telegram && config.channels.telegram.accounts)) {
     const dmPolicy = process.env.TELEGRAM_DM_POLICY || 'pairing';
     config.channels.telegram = {
         botToken: process.env.TELEGRAM_BOT_TOKEN,
@@ -287,6 +288,8 @@ if (process.env.TELEGRAM_BOT_TOKEN) {
     } else if (dmPolicy === 'open') {
         config.channels.telegram.allowFrom = ['*'];
     }
+} else if (config.channels.telegram && config.channels.telegram.accounts) {
+    console.log('Telegram multi-account config detected, skipping env override');
 }
 
 // Discord configuration
