@@ -1,5 +1,5 @@
 #!/bin/bash
-# Startup script for OpenClaw in Cloudflare Sandbox (v3)
+# Startup script for OpenClaw in Cloudflare Sandbox
 # This script:
 # 1. Restores config/workspace/skills from R2 via rclone (if configured)
 # 2. Runs openclaw onboard --non-interactive to configure from env vars
@@ -114,8 +114,6 @@ if [ ! -f "$CONFIG_FILE" ]; then
         AUTH_ARGS="--auth-choice apiKey --anthropic-api-key $ANTHROPIC_API_KEY"
     elif [ -n "$OPENAI_API_KEY" ]; then
         AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $OPENAI_API_KEY"
-    elif [ -n "$MOONSHOT_API_KEY" ]; then
-        AUTH_ARGS="--auth-choice openai-api-key --openai-api-key $MOONSHOT_API_KEY"
     fi
 
     openclaw onboard --non-interactive --accept-risk \
@@ -221,62 +219,10 @@ if (process.env.CF_AI_GATEWAY_MODEL) {
     }
 }
 
-// Anthropic configuration
-if (process.env.ANTHROPIC_API_KEY) {
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    config.models.providers['anthropic'] = config.models.providers['anthropic'] || {};
-    config.models.providers['anthropic'].baseUrl = 'https://api.anthropic.com';
-    config.models.providers['anthropic'].apiKey = process.env.ANTHROPIC_API_KEY;
-    config.models.providers['anthropic'].api = 'anthropic-messages';
-    if (!config.models.providers['anthropic'].models || config.models.providers['anthropic'].models.length === 0) {
-        config.models.providers['anthropic'].models = [
-            { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', contextWindow: 200000, maxTokens: 16384 },
-            { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', contextWindow: 200000, maxTokens: 16384 },
-        ];
-    }
-    console.log('Anthropic configured: apiKey injected from env');
-}
-
-// Moonshot AI (Kimi K2.5) configuration
-if (process.env.MOONSHOT_API_KEY) {
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    config.models.providers['moonshot'] = {
-        baseUrl: 'https://api.moonshot.cn/v1',
-        apiKey: process.env.MOONSHOT_API_KEY,
-        api: 'openai-completions',
-        models: [
-            { id: 'kimi-k2.5', name: 'Kimi K2.5', contextWindow: 262144, maxTokens: 8192 },
-        ],
-    };
-    // Set Kimi K2.5 as default model
-    config.agents = config.agents || {};
-    config.agents.defaults = config.agents.defaults || {};
-    config.agents.defaults.model = { primary: 'moonshot/kimi-k2.5' };
-    console.log('Moonshot AI configured: Kimi K2.5 set as primary model');
-}
-
-// MiniMax configuration
-if (process.env.MINIMAX_API_KEY) {
-    config.models = config.models || {};
-    config.models.providers = config.models.providers || {};
-    config.models.providers['minimax'] = {
-        baseUrl: 'https://api.minimaxi.com/anthropic',
-        apiKey: process.env.MINIMAX_API_KEY,
-        api: 'anthropic-messages',
-        models: [
-            { id: 'MiniMax-M2.5', name: 'MiniMax M2.5', contextWindow: 200000, maxTokens: 8192 },
-        ],
-    };
-    console.log('MiniMax configured: MiniMax-M2.5 available');
-}
-
 // Telegram configuration
-// Skip patching if config already has multi-account structure (accounts key)
 // Overwrite entire channel object to drop stale keys from old R2 backups
 // that would fail OpenClaw's strict config validation (see #47)
-if (process.env.TELEGRAM_BOT_TOKEN && !(config.channels.telegram && config.channels.telegram.accounts)) {
+if (process.env.TELEGRAM_BOT_TOKEN) {
     const dmPolicy = process.env.TELEGRAM_DM_POLICY || 'pairing';
     config.channels.telegram = {
         botToken: process.env.TELEGRAM_BOT_TOKEN,
@@ -288,8 +234,6 @@ if (process.env.TELEGRAM_BOT_TOKEN && !(config.channels.telegram && config.chann
     } else if (dmPolicy === 'open') {
         config.channels.telegram.allowFrom = ['*'];
     }
-} else if (config.channels.telegram && config.channels.telegram.accounts) {
-    console.log('Telegram multi-account config detected, skipping env override');
 }
 
 // Discord configuration
